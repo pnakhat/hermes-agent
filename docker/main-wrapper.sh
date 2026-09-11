@@ -28,7 +28,16 @@ if [ -z "${HERMES_MAIN_WRAPPER_ENV_READY:-}" ] && \
 fi
 unset HERMES_MAIN_WRAPPER_ENV_READY
 
-drop() { [ "$(id -u)" = 0 ] && set -- s6-setuidgid hermes "$@"; exec "$@"; }
+drop() {
+    # HERMES_RUN_AS_ROOT opts out of the privilege drop for sandboxed
+    # platforms (e.g. Railway) that mount fresh volumes root-owned and
+    # strip CAP_CHOWN, so stage2-hook.sh's chown of $HERMES_HOME silently
+    # fails and the hermes user is left unable to write to the volume.
+    if [ "$(id -u)" = 0 ] && [ "${HERMES_RUN_AS_ROOT:-}" != "1" ]; then
+        set -- s6-setuidgid hermes "$@"
+    fi
+    exec "$@"
+}
 
 # --- Reject the unsupported `docker run --user <uid>:<gid>` start ---
 # Mirror the guard in stage2-hook.sh (cont-init). This is the surface the
